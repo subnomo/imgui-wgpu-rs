@@ -12,15 +12,15 @@ categories = ["gui", "graphics", "rendering", "rendering::graphics-api"]
 keywords = ["gui", "graphics", "wgpu", "imgui"]
 license = "MIT OR Apache-2.0"
 
-[features]
-default = []
-metal = ["wgpu/metal"]
-dx11 = ["wgpu/dx11"]
-dx12 = ["wgpu/dx12"]
-vulkan = ["wgpu/vulkan"]
+# [features]
+# default = []
+# metal = ["wgpu/metal"]
+# dx11 = ["wgpu/dx11"]
+# dx12 = ["wgpu/dx12"]
+# vulkan = ["wgpu/vulkan"]
 
 [dependencies]
-wgpu = { version = "0.3.0" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
 glsl-to-spirv = "0.1"
 log = "0.4"
 imgui = "0.2.0"

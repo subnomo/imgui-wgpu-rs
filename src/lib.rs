@@ -106,50 +106,14 @@ impl Renderer {
     pub fn new(
         imgui: &mut Context,
         device: &mut Device,
+        queue: &mut Queue,
         format: TextureFormat,
         clear_color: Option<Color>,
-    ) -> Renderer {
-        let (vs_code, fs_code) = Shaders::get_program_code();
-        let vs_raw = Shaders::compile_glsl(vs_code, ShaderStage::Vertex);
-        let fs_raw = Shaders::compile_glsl(fs_code, ShaderStage::Fragment);
-        Self::new_impl(imgui, device, format, clear_color, vs_raw, fs_raw)
-    }
-
-    /// Create an entirely new imgui wgpu renderer, using prebuilt spirv shaders
-    pub fn new_static(
-        imgui: &mut Context,
-        device: &mut Device,
-        format: TextureFormat,
-        clear_color: Option<Color>,
-    ) -> Renderer {
-        let vs_bytes = include_bytes!("imgui.vert.spv");
-        let fs_bytes = include_bytes!("imgui.frag.spv");
-
-        fn compile(shader: &[u8]) -> Vec<u32> {
-            let mut words = vec![];
-            for bytes4 in shader.chunks(4) {
-                words.push(u32::from_le_bytes([
-                    bytes4[0], bytes4[1], bytes4[2], bytes4[3],
-                ]));
-            }
-            words
-        }
-
-        Self::new_impl(imgui, device, format, clear_color, compile(vs_bytes), compile(fs_bytes))
-    }
-
-    /// Create an entirely new imgui wgpu renderer.
-    fn new_impl(
-        imgui: &mut Context,
-        device: &mut Device,
-        format: TextureFormat,
-        clear_color: Option<Color>,
-        vs_raw: Vec<u32>,
-        fs_raw: Vec<u32>,
     ) -> Renderer {
         // Load shaders.
-        let vs_module = device.create_shader_module(&vs_raw);
-        let fs_module = device.create_shader_module(&fs_raw);
+        let (vs_code, fs_code) = Shaders::get_program_code();
+        let vs_module = device.create_shader_module(&Shaders::compile_glsl(vs_code, ShaderStage::Vertex));
+        let fs_module = device.create_shader_module(&Shaders::compile_glsl(fs_code, ShaderStage::Fragment));
 
         // Create the uniform matrix buffer.
         let size = 64;
@@ -284,7 +248,7 @@ impl Renderer {
         };
 
         // Immediately load the fon texture to the GPU.
-        renderer.reload_font_texture(imgui, device);
+        renderer.reload_font_texture(imgui, device, queue);
 
         renderer
     }
@@ -439,10 +403,10 @@ impl Renderer {
     /// Updates the texture on the GPU corresponding to the current imgui font atlas.
     /// 
     /// This has to be called after loading a font.
-    pub fn reload_font_texture(&mut self, imgui: &mut Context, device: &mut Device) {
+    pub fn reload_font_texture(&mut self, imgui: &mut Context, device: &mut Device, queue: &mut Queue) {
         let mut atlas = imgui.fonts();
         let handle = atlas.build_rgba32_texture();
-        let font_texture_id = self.upload_font_texture(device, &handle.data, handle.width, handle.height);
+        let font_texture_id = self.upload_font_texture(device, queue, &handle.data, handle.width, handle.height);
         
         atlas.tex_id = font_texture_id;
     }
@@ -451,6 +415,7 @@ impl Renderer {
     fn upload_font_texture(
         &mut self,
         device: &mut Device,
+        queue: &mut Queue,
         data: &[u8],
         width: u32,
         height: u32
@@ -505,9 +470,7 @@ impl Renderer {
         );
 
         // Resolve the actual copy process.
-        device
-            .get_queue()
-            .submit(&[encoder.finish()]);
+        queue.submit(&[encoder.finish()]);
 
         let texture = Texture::new(texture, &self.texture_layout, device);
         self.textures.insert(texture)
